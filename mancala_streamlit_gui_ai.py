@@ -12,17 +12,13 @@ NEXT_PIT = {
     '1': 'L', 'L': 'K', 'K': 'J', 'J': 'I', 'I': 'H', 'H': 'G',
     'G': '2', '2': 'A'
 }
-STARTING_SEEDS = 4
 
-# --- caching helpers ---
 @st.cache_data
-def get_new_board():
-    s = STARTING_SEEDS
-    return {
-        '1': 0, '2': 0,
-        'A': s, 'B': s, 'C': s, 'D': s, 'E': s, 'F': s,
-        'G': s, 'H': s, 'I': s, 'J': s, 'K': s, 'L': s
-    }
+def get_new_board(starting_seeds=4):
+    board = {'1': 0, '2': 0}
+    for pit in PLAYER_1_PITS + PLAYER_2_PITS:
+        board[pit] = starting_seeds  # set seeds per pit based on sidebar input
+    return board
 
 @st.cache_data
 def stone_text(n, with_word=False):
@@ -52,12 +48,11 @@ def make_move(board, player, pit):
     return '2' if player == '1' else '1'
 
 def check_winner(board):
-    # early termination: if a player has > half of 48 stones in mancala, game over
-    if board['1'] > 24:
+    total = sum(board[p] for p in ['1', '2'] + list(PLAYER_1_PITS) + list(PLAYER_2_PITS))
+    if board['1'] > total / 2:
         return "Player 1 wins!"
-    if board['2'] > 24:
+    if board['2'] > total / 2:
         return "Player 2 wins!"
-    # endgame when one side's pits are empty
     p1_total = sum(board[p] for p in PLAYER_1_PITS)
     p2_total = sum(board[p] for p in PLAYER_2_PITS)
     if p1_total == 0:
@@ -138,8 +133,10 @@ def human_move_callback(player, pit):
         st.session_state.winner = winner
 
 def new_game_callback():
-    st.session_state.board = get_new_board()
-    st.session_state.playerTurn = '1'
+    seeds = st.session_state.starting_seeds  # get starting seeds from sidebar
+    first = st.session_state.first_move      # get first move selection from sidebar
+    st.session_state.board = get_new_board(seeds)
+    st.session_state.playerTurn = '1' if first == "Player 1" else '2'
     st.session_state.winner = None
 
 # --- ui rendering ---
@@ -231,6 +228,9 @@ def main():
     search_depth = st.sidebar.number_input("AI Search Depth (0 for unlimited)", min_value=0, value=10, step=1)
     hints = st.sidebar.checkbox("Hints", value=False)
     depth = None if search_depth == 0 else int(search_depth)
+
+    st.sidebar.number_input("Number of starting seeds", min_value=1, value=4, step=1, key="starting_seeds")
+    st.sidebar.radio("Who goes first?", ["Player 1", "Player 2"], key="first_move")
     
     if 'board' not in st.session_state:
         st.session_state.board = get_new_board()
