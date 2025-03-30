@@ -158,6 +158,16 @@ def render_styles():
             justify-content: center;
             align-items: center;
         }
+        @media screen and (max-width: 768px) {
+            div.stButton > button {
+                width: 60px;
+                height: 60px;
+                font-size: 18px;
+            }
+            .mancala-container {
+                height: 120px;
+            }
+        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -223,6 +233,55 @@ def render_board(depth, hints, opponent):
         st.button(f"{disp}\n\n{stone_text(store_val)}", key="store_player1", disabled=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
+def render_board_mobile(depth, hints, opponent):
+    st.markdown("#### Player 2 Mancala: " + stone_text(st.session_state.board['2']))
+    st.markdown("#### Top Row (Player 2)")
+    top_cols = st.columns(6)
+    for i, pit in enumerate("GHIJKL"):
+        stones = st.session_state.board[pit]
+        disp = "•" * stones if stones else ""
+        clickable = (opponent == "Human" and st.session_state.playerTurn == '2' and stones > 0)
+        hint_str = ""
+        if hints and clickable:
+            board_copy = st.session_state.board.copy()
+            new_player = make_move(board_copy, '2', pit)
+            eval_val, _ = minimax(board_copy, depth - 1 if depth is not None else None,
+                                  -float('inf'), float('inf'), new_player)
+            if abs(eval_val) == 1000:
+                hint_str = "🟢 (W)" if eval_val > 0 else "🔴 (L)"
+            else:
+                hint_str = f"({eval_val:+d})"
+        with top_cols[i]:
+            st.button(disp + (f"\n\n{hint_str}" if hint_str else ""),
+                      key=f"pit_{pit}_top_mobile", disabled=not clickable,
+                      on_click=human_move_callback, args=('2', pit))
+            st.write(stone_text(st.session_state.board[pit], True))
+    st.markdown("---")
+    st.markdown("#### Bottom Row (Player 1)")
+    bottom_cols = st.columns(6)
+    for i, pit in enumerate("ABCDEF"):
+        stones = st.session_state.board[pit]
+        disp = "•" * stones if stones else ""
+        clickable = st.session_state.playerTurn == '1' and stones > 0
+        hint_str = ""
+        if hints and clickable:
+            board_copy = st.session_state.board.copy()
+            new_player = make_move(board_copy, '1', pit)
+            eval_val, _ = minimax(board_copy, depth - 1 if depth is not None else None,
+                                  -float('inf'), float('inf'), new_player)
+            perspective = -eval_val  # invert for player1
+            if abs(perspective) == 1000:
+                hint_str = "🟢 (W)" if perspective > 0 else "🔴 (L)"
+            else:
+                hint_str = f"({perspective:+d})"
+        with bottom_cols[i]:
+            st.button(disp + (f"\n\n{hint_str}" if hint_str else ""),
+                      key=f"pit_{pit}_bottom_mobile", disabled=not clickable,
+                      on_click=human_move_callback, args=('1', pit))
+            st.write(stone_text(st.session_state.board[pit], True))
+    st.markdown("#### Player 1 Mancala: " + stone_text(st.session_state.board['1']))
+
+# in main(), add a layout selection option and choose the appropriate renderer
 def main():
     render_styles()
     st.title("Mancala")
@@ -231,6 +290,7 @@ def main():
     search_depth = st.sidebar.number_input("AI Search Depth (0 for unlimited)", min_value=0, value=10, step=1)
     hints = st.sidebar.checkbox("Hints", value=False)
     depth = None if search_depth == 0 else int(search_depth)
+    layout_choice = st.sidebar.radio("Layout", ["Desktop", "Mobile"])
     
     if 'board' not in st.session_state:
         st.session_state.board = get_new_board()
@@ -242,7 +302,10 @@ def main():
     if opponent == "AI" and st.session_state.playerTurn == '2':
         ai_move_callback(depth)
 
-    render_board(depth, hints, opponent)
+    if layout_choice == "Desktop":
+        render_board(depth, hints, opponent)
+    else:
+        render_board_mobile(depth, hints, opponent)
     
     if st.session_state.winner:
         st.success(st.session_state.winner)
